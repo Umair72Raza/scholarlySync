@@ -1,0 +1,25 @@
+# ─── Dependencies ─────────────────────────────────────
+node_modules/
+
+# ─── Build output ─────────────────────────────────────
+dist/
+
+# ─── Environment ──────────────────────────────────────
+.env
+.env.local
+.env.production
+
+# ─── Uploads (real files — don't commit) ──────────────
+uploads/*
+!uploads/.gitkeep
+
+# ─── Prisma ───────────────────────────────────────────
+prisma/migrations/
+
+# ─── Logs ─────────────────────────────────────────────
+*.log
+logs/
+
+# ─── OS ───────────────────────────────────────────────
+.DS_Store
+Thumbs.db
