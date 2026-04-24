@@ -7,7 +7,7 @@ import axios from 'axios';
  *   are attached to every request automatically — no manual token management.
  */
 const api = axios.create({
-  baseURL: '/api',
+  baseURL: import.meta.env.VITE_API_URL,
   withCredentials: true, // ← sends & receives cookies on every request
   headers: {
     'Content-Type': 'application/json',

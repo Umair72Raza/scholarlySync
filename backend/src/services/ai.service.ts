@@ -1,90 +1,56 @@
-import Anthropic from '@anthropic-ai/sdk';
+import { Anthropic } from '@anthropic-ai/sdk';
 import { env } from '../config/env';
-import { redis } from '../config/redis';
-import { AppError } from '../middlewares/errorHandler';
 
-const client = new Anthropic({ apiKey: env.ANTHROPIC_API_KEY });
+const anthropic = new Anthropic({
+  apiKey: env.ANTHROPIC_API_KEY,
+});
 
-const AI_RATE_PREFIX = 'ai_rate:';
-const AI_RATE_MAX = 20;      // 20 requests
-const AI_RATE_WINDOW = 60;   // per 60 seconds
+export class AIService {
+  static async getSummary(content: string) {
+    try {
+      const response = await anthropic.messages.create({
+        model: 'claude-3-haiku-20240307',
+        max_tokens: 500,
+        messages: [
+          {
+            role: 'user',
+            content: `Please provide a concise, academic summary of the following study material. Use bullet points for key takeaways:\n\n${content}`
+          }
+        ],
+      });
 
-// ─── Rate Limiter ─────────────────────────────────────────
-export const checkAIRateLimit = async (userId: string): Promise<void> => {
-  const key = `${AI_RATE_PREFIX}${userId}`;
-  const count = await redis.incr(key);
-  if (count === 1) await redis.expire(key, AI_RATE_WINDOW);
-  if (count > AI_RATE_MAX) {
-    throw new AppError(`AI rate limit exceeded. Max ${AI_RATE_MAX} requests per minute.`, 429, 'RATE_LIMITED');
-  }
-};
-
-// ─── Non-streaming query ──────────────────────────────────
-export const askClaude = async (
-  materialTitle: string,
-  materialContent: string,
-  userQuestion: string,
-): Promise<string> => {
-  const message = await client.messages.create({
-    model: 'claude-opus-4-5',
-    max_tokens: 1024,
-    system: buildSystemPrompt(materialTitle),
-    messages: [
-      {
-        role: 'user',
-        content: buildUserMessage(materialContent, userQuestion),
-      },
-    ],
-  });
-
-  const textBlock = message.content.find((b) => b.type === 'text');
-  if (!textBlock || textBlock.type !== 'text') {
-    throw new AppError('AI returned an empty response', 502, 'AI_EMPTY_RESPONSE');
-  }
-  return textBlock.text;
-};
-
-// ─── Streaming query (SSE) ────────────────────────────────
-export const streamClaude = async (
-  materialTitle: string,
-  materialContent: string,
-  userQuestion: string,
-  onChunk: (text: string) => void,
-  onDone: () => void,
-): Promise<void> => {
-  const stream = await client.messages.create({
-    model: 'claude-opus-4-5',
-    max_tokens: 1024,
-    stream: true,
-    system: buildSystemPrompt(materialTitle),
-    messages: [
-      {
-        role: 'user',
-        content: buildUserMessage(materialContent, userQuestion),
-      },
-    ],
-  });
-
-  for await (const event of stream) {
-    if (event.type === 'content_block_delta' && event.delta.type === 'text_delta') {
-      onChunk(event.delta.text);
+      return (response.content[0] as any).text;
+    } catch (error) {
+      console.error('Claude Summary Error:', error);
+      throw new Error('Failed to generate summary');
     }
   }
-  onDone();
-};
 
-// ─── Prompt builders ──────────────────────────────────────
-const buildSystemPrompt = (materialTitle: string): string =>
-  `You are an expert academic tutor specialising in the subject covered by "${materialTitle}".
+  static async askQuestion(content: string, question: string, history: { role: 'user' | 'assistant', content: string }[] = []) {
+    try {
+      const response = await anthropic.messages.create({
+        model: 'claude-3-sonnet-20240229',
+        max_tokens: 1000,
+        system: `You are ScholarlySync AI, a helpful study assistant. 
+        You have access to the following course material:
+        ---
+        ${content}
+        ---
+        Use ONLY this material to answer the student's questions. If the answer is not in the material, politely say you don't know based on this document. 
+        Keep your tone academic, encouraging, and clear.`,
+        messages: [
+          ...history,
+          {
+            role: 'user',
+            content: question
+          }
+        ],
+      });
 
-Your responsibilities:
-1. Answer questions directly related to the provided study material.
-2. Explain difficult concepts with clear examples and analogies.
-3. Summarise sections when asked.
-4. Generate quiz questions and answers when requested.
-5. Keep responses structured, concise, and educationally valuable.
-
-Always ground your responses in the provided material. If a question is outside the material's scope, say so politely and redirect.`;
-
-const buildUserMessage = (materialContent: string, question: string): string =>
-  `Study Material:\n---\n${materialContent.slice(0, 15000)}\n---\n\nStudent Question: ${question}`;
+      return (response.content[0] as any).text;
+    } catch (error) {
+      console.error('Claude Question Error:', error);
+      throw new Error('Failed to get answer from AI');
+    }
+  }
+}

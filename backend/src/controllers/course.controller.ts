@@ -115,5 +115,69 @@ export const CourseController = {
       await (prisma.course as any).delete({ where: { id: courseId } });
       res.json({ success: true, message: 'Course deleted successfully' });
     } catch (err) { next(err); }
+  },
+
+  enroll: async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+    try {
+      const { id } = req.params;
+      const userId = req.user!.sub;
+
+      const course = await (prisma.course as any).findUnique({ 
+        where: { id: id as string },
+        include: { students: { where: { id: userId } } }
+      });
+
+      if (!course) throw new AppError('Course not found', 404);
+      if (course.students.length > 0) throw new AppError('Already enrolled in this course', 400);
+
+      await (prisma.course as any).update({
+        where: { id: id as string },
+        data: { students: { connect: { id: userId } } }
+      });
+
+      res.json({ success: true, message: 'Enrolled successfully' });
+    } catch (err) { next(err); }
+  },
+
+  getEnrolled: async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+    try {
+      const courses = await (prisma.course as any).findMany({
+        where: { students: { some: { id: req.user!.sub } } },
+        include: { 
+          teacher: { select: { id: true, name: true } },
+          _count: { select: { assignments: true, materials: true } }
+        }
+      });
+      res.json({ success: true, data: { courses } });
+    } catch (err) { next(err); }
+  },
+
+  getAvailable: async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+    try {
+      const courses = await (prisma.course as any).findMany({
+        where: { 
+          NOT: { students: { some: { id: req.user!.sub } } }
+        },
+        include: { 
+          teacher: { select: { id: true, name: true } },
+          _count: { select: { assignments: true, materials: true } }
+        }
+      });
+      res.json({ success: true, data: { courses } });
+    } catch (err) { next(err); }
+  },
+
+  unenroll: async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+    try {
+      const { id } = req.params;
+      const userId = req.user!.sub;
+
+      await (prisma.course as any).update({
+        where: { id: id as string },
+        data: { students: { disconnect: { id: userId } } }
+      });
+
+      res.json({ success: true, message: 'Unenrolled successfully' });
+    } catch (err) { next(err); }
   }
 };

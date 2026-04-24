@@ -38,4 +38,15 @@ router.get('/:assignmentId/submissions',
   SubmissionController.getByAssignment,
 );
 
+// ─── Submission management (Teacher) ──────────────────────────────
+router.get('/submissions/teacher',
+  requireRole('TEACHER', 'ADMIN'),
+  SubmissionController.getTeacherDashboard,
+);
+
+router.patch('/submissions/:id/grade',
+  requireRole('TEACHER', 'ADMIN'),
+  SubmissionController.grade,
+);
+
 export default router;

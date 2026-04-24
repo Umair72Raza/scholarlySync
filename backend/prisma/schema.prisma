@@ -24,7 +24,7 @@ enum Role {
 enum SubmissionStatus {
   QUEUED
   PROCESSING
-  VERIFIED
+  GRADED
   FAILED
 }
 
@@ -45,6 +45,7 @@ model User {
   submissions       Submission[]
   notifications     Notification[]
   instructorCourses Course[]       @relation("CourseInstructor")
+  enrolledCourses   Course[]       @relation("CourseEnrollment")
 
   @@map("users")
 }
@@ -60,6 +61,7 @@ model Course {
   teacher     User         @relation("CourseInstructor", fields: [teacherId], references: [id], onDelete: Cascade)
   assignments Assignment[]
   materials   Material[]
+  students    User[]       @relation("CourseEnrollment")
 
   @@map("courses")
 }
@@ -87,6 +89,8 @@ model Submission {
   fileName     String
   fileSize     Int              // in bytes
   status       SubmissionStatus @default(QUEUED)
+  grade        Int?             // Percentage (0-100)
+  feedback     String?          // Teacher's comments
   errorMessage String?
   createdAt    DateTime         @default(now())
   updatedAt    DateTime         @updatedAt

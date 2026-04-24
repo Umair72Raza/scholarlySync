@@ -1,47 +1,76 @@
-import { Request, Response, NextFunction } from 'express';
-import { MaterialModel } from '../models/material.model';
-import { askClaude, streamClaude, checkAIRateLimit } from '../services/ai.service';
-import { AppError } from '../middlewares/errorHandler';
+import { Response } from 'express';
+import prisma from '../config/prisma';
+import { AIService } from '../services/ai.service';
+import { AppError, catchAsync } from '../middlewares/errorHandler';
 
-export const AIController = {
+export class AIController {
+  static ask = catchAsync(async (req: any, res: Response) => {
+    const { materialId, question, history } = req.body;
+    const userId = req.user?.sub;
 
-  /**
-   * POST /api/materials/:id/ask
-   * Protected by: authenticate → requirePremium
-   * Streams Claude's response as Server-Sent Events.
-   */
-  ask: async (req: Request, res: Response, next: NextFunction): Promise<void> => {
-    try {
-      const { question } = req.body;
-      if (!question?.trim()) throw new AppError('A question is required', 400);
+    if (!userId) throw new AppError('Unauthorized', 401);
 
-      const material = await MaterialModel.findById(req.params.id);
-      if (!material) throw new AppError('Study material not found', 404);
+    // 1. Verify Premium Status
+    const user = await prisma.user.findUnique({
+      where: { id: userId },
+      select: { is_premium: true }
+    });
 
-      // Per-user AI rate limit (20 req/min via Redis)
-      await checkAIRateLimit(req.user!.sub);
+    if (!user?.is_premium) {
+      throw new AppError('Premium subscription required for AI features', 403);
+    }
 
-      const streaming = req.headers.accept?.includes('text/event-stream');
+    // 2. Get Material Content
+    const material = await prisma.material.findUnique({
+      where: { id: materialId },
+      select: { content: true }
+    });
 
-      if (streaming) {
-        // ─── Streaming (SSE) mode ──────────────────────────
-        res.setHeader('Content-Type', 'text/event-stream');
-        res.setHeader('Cache-Control', 'no-cache');
-        res.setHeader('Connection', 'keep-alive');
-        res.flushHeaders();
+    if (!material?.content) {
+      throw new AppError('Material content is empty or not yet processed.', 404);
+    }
 
-        await streamClaude(
-          material.title,
-          material.content,
-          question,
-          (chunk) => res.write(`data: ${JSON.stringify({ chunk })}\n\n`),
-          ()      => { res.write('data: [DONE]\n\n'); res.end(); },
-        );
-      } else {
-        // ─── Non-streaming (JSON) mode ────────────────────
-        const answer = await askClaude(material.title, material.content, question);
-        res.json({ success: true, data: { answer, materialId: material.id } });
-      }
-    } catch (err) { next(err); }
-  },
-};
+    // 3. Call AI Service
+    const answer = await AIService.askQuestion(material.content, question, history);
+
+    res.json({
+      success: true,
+      data: answer
+    });
+  });
+
+  static summarize = catchAsync(async (req: any, res: Response) => {
+    const { materialId } = req.body;
+    const userId = req.user?.sub;
+
+    if (!userId) throw new AppError('Unauthorized', 401);
+
+    // 1. Verify Premium Status
+    const user = await prisma.user.findUnique({
+      where: { id: userId },
+      select: { is_premium: true }
+    });
+
+    if (!user?.is_premium) {
+      throw new AppError('Premium subscription required for AI Summaries', 403);
+    }
+
+    // 2. Get Material Content
+    const material = await prisma.material.findUnique({
+      where: { id: materialId },
+      select: { content: true }
+    });
+
+    if (!material?.content) {
+      throw new AppError('Material content is empty or not yet processed.', 404);
+    }
+
+    // 3. Generate Summary
+    const summary = await AIService.getSummary(material.content);
+
+    res.json({
+      success: true,
+      data: { summary }
+    });
+  });
+}

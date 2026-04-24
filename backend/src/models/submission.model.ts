@@ -40,4 +40,28 @@ export const SubmissionModel = {
       where: { assignmentId },
       _count: { status: true },
     }),
+
+  grade: (id: string, grade: number, feedback?: string) =>
+    prisma.submission.update({
+      where: { id },
+      data: { 
+        grade, 
+        feedback,
+        status: 'GRADED'
+      }
+    }),
+
+  findForTeacher: (teacherId: string) =>
+    prisma.submission.findMany({
+      where: {
+        assignment: {
+          course: { teacherId }
+        }
+      },
+      include: {
+        user: { select: { id: true, name: true } },
+        assignment: { select: { id: true, title: true, course: { select: { name: true } } } }
+      },
+      orderBy: { createdAt: 'desc' }
+    })
 };

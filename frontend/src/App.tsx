@@ -9,6 +9,9 @@ import { Landing } from './pages/Landing';
 import { StudentLayout, TeacherLayout, AdminLayout } from './layouts/RoleLayouts';
 import { TeacherCourses } from './pages/teacher/TeacherCourses';
 import { TeacherCourseDetail } from './pages/teacher/TeacherCourseDetail';
+import { TeacherGrading } from './pages/teacher/TeacherGrading';
+import { StudentCourses } from './pages/student/StudentCourses';
+import { StudentCourseDetail } from './pages/student/StudentCourseDetail';
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -59,7 +62,8 @@ function AppRoutes() {
         {/* Student Routes */}
         <Route element={<StudentLayout />}>
           <Route path="/student" element={<Dashboard />} />
-          <Route path="/student/courses" element={<div className="text-white">Student Courses</div>} />
+          <Route path="/student/courses" element={<StudentCourses />} />
+          <Route path="/student/courses/:id" element={<StudentCourseDetail />} />
           <Route path="/student/assignments" element={<div className="text-white">Student Assignments</div>} />
           <Route path="/student/ai-room" element={<div className="text-white">AI Study Room</div>} />
         </Route>
@@ -69,7 +73,7 @@ function AppRoutes() {
           <Route path="/teacher" element={<Dashboard />} />
           <Route path="/teacher/courses" element={<TeacherCourses />} />
           <Route path="/teacher/courses/:id" element={<TeacherCourseDetail />} />
-          <Route path="/teacher/grading" element={<div className="text-white">Grading Center</div>} />
+          <Route path="/teacher/grading" element={<TeacherGrading />} />
           <Route path="/teacher/analytics" element={<div className="text-white">Class Analytics</div>} />
         </Route>
 
