@@ -71,7 +71,12 @@ export const errorHandler = (
 
   // Prisma validation errors
   if (err instanceof Prisma.PrismaClientValidationError) {
-    res.status(400).json({ success: false, message: 'Invalid data provided.', code: 'VALIDATION_ERROR' });
+    res.status(400).json({ 
+      success: false, 
+      message: 'Invalid data provided.', 
+      code: 'VALIDATION_ERROR',
+      ...(env.NODE_ENV === 'development' && { details: err.message })
+    });
     return;
   }
 

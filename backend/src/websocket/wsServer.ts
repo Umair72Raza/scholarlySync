@@ -12,9 +12,13 @@ export const attachWebSocketServer = (server: http.Server): void => {
   const wss = new WebSocketServer({ server, path: '/ws' });
 
   wss.on('connection', (ws, req) => {
-    // Authenticate via token in query string: ws://host/ws?token=<JWT>
-    const url = new URL(req.url ?? '', `http://localhost`);
-    const token = url.searchParams.get('token');
+    // Authenticate via httpOnly cookie sent automatically by the browser
+    const cookieHeader = req.headers.cookie;
+    let token: string | null = null;
+    if (cookieHeader) {
+      const match = cookieHeader.match(/accessToken=([^;]+)/);
+      if (match) token = match[1];
+    }
 
     if (!token) {
       ws.close(1008, 'Authentication token required');

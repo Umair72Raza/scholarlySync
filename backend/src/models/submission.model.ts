@@ -47,7 +47,7 @@ export const SubmissionModel = {
       data: { 
         grade, 
         feedback,
-        status: 'GRADED'
+        status: SubmissionStatus.GRADED
       }
     }),
 

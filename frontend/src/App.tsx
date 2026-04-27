@@ -12,6 +12,8 @@ import { TeacherCourseDetail } from './pages/teacher/TeacherCourseDetail';
 import { TeacherGrading } from './pages/teacher/TeacherGrading';
 import { StudentCourses } from './pages/student/StudentCourses';
 import { StudentCourseDetail } from './pages/student/StudentCourseDetail';
+import { SocketProvider } from './context/SocketContext';
+import { Toaster } from 'react-hot-toast';
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -64,8 +66,6 @@ function AppRoutes() {
           <Route path="/student" element={<Dashboard />} />
           <Route path="/student/courses" element={<StudentCourses />} />
           <Route path="/student/courses/:id" element={<StudentCourseDetail />} />
-          <Route path="/student/assignments" element={<div className="text-white">Student Assignments</div>} />
-          <Route path="/student/ai-room" element={<div className="text-white">AI Study Room</div>} />
         </Route>
 
         {/* Teacher Routes */}
@@ -74,7 +74,6 @@ function AppRoutes() {
           <Route path="/teacher/courses" element={<TeacherCourses />} />
           <Route path="/teacher/courses/:id" element={<TeacherCourseDetail />} />
           <Route path="/teacher/grading" element={<TeacherGrading />} />
-          <Route path="/teacher/analytics" element={<div className="text-white">Class Analytics</div>} />
         </Route>
 
         {/* Admin Routes */}
@@ -95,9 +94,12 @@ function AppRoutes() {
 function App() {
   return (
     <QueryClientProvider client={queryClient}>
-      <Router>
-        <AppRoutes />
-      </Router>
+      <SocketProvider>
+        <Router>
+          <AppRoutes />
+        </Router>
+        <Toaster position="bottom-right" />
+      </SocketProvider>
     </QueryClientProvider>
   );
 }

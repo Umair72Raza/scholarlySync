@@ -30,23 +30,4 @@ router.post(
   AssignmentController.submit,
 );
 
-// ─── Submission read routes ───────────────────────────────────────
-router.get('/submissions/mine',             SubmissionController.getMySubmissions);
-router.get('/submissions/:id',              SubmissionController.getById);
-router.get('/:assignmentId/submissions',
-  requireRole('TEACHER', 'ADMIN'),
-  SubmissionController.getByAssignment,
-);
-
-// ─── Submission management (Teacher) ──────────────────────────────
-router.get('/submissions/teacher',
-  requireRole('TEACHER', 'ADMIN'),
-  SubmissionController.getTeacherDashboard,
-);
-
-router.patch('/submissions/:id/grade',
-  requireRole('TEACHER', 'ADMIN'),
-  SubmissionController.grade,
-);
-
 export default router;

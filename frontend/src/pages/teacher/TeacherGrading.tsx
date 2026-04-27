@@ -2,10 +2,12 @@ import React, { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { 
   Search, Filter, CheckCircle, Clock, 
-  ExternalLink, MessageSquare, Award, Loader2,
+  ExternalLink, MessageSquare, Award, Loader2, FileText,
   ChevronRight, AlertCircle, X, Download
 } from 'lucide-react';
 import api from '../../services/api';
+import { useSocketEvent } from '../../context/SocketContext';
+import { toast } from 'react-hot-toast';
 
 interface Submission {
   id: string;
@@ -39,14 +41,19 @@ export const TeacherGrading: React.FC = () => {
   const { data: submissions, isLoading, error } = useQuery<Submission[]>({
     queryKey: ['teacher-submissions'],
     queryFn: async () => {
-      const { data } = await api.get('/assignments/submissions/teacher');
+      const { data } = await api.get('/submissions/teacher');
       return data.data.submissions;
     }
   });
 
+  // 📡 Real-time updates via custom hook
+  useSocketEvent('NEW_SUBMISSION', () => {
+    queryClient.invalidateQueries({ queryKey: ['teacher-submissions'] });
+  });
+
   const gradeMutation = useMutation({
     mutationFn: (data: { id: string, grade: number, feedback: string }) => 
-      api.patch(`/assignments/submissions/${data.id}/grade`, { grade: data.grade, feedback: data.feedback }),
+      api.patch(`/submissions/${data.id}/grade`, { grade: data.grade, feedback: data.feedback }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['teacher-submissions'] });
       setSelectedSubmission(null);
@@ -58,9 +65,25 @@ export const TeacherGrading: React.FC = () => {
   const filteredSubmissions = submissions?.filter(s => {
     const matchesSearch = s.user.name.toLowerCase().includes(searchTerm.toLowerCase()) || 
                          s.assignment.title.toLowerCase().includes(searchTerm.toLowerCase());
-    const matchesStatus = statusFilter === 'ALL' || s.status === statusFilter;
+    
+    let matchesStatus = statusFilter === 'ALL';
+    if (statusFilter === 'PENDING') {
+      matchesStatus = s.status === 'QUEUED' || s.status === 'PROCESSING';
+    } else if (statusFilter === 'GRADED') {
+      matchesStatus = s.status === 'GRADED';
+    }
+    
     return matchesSearch && matchesStatus;
   });
+
+  const getStatusColor = (status: string) => {
+    switch (status) {
+      case 'GRADED': return 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20';
+      case 'PROCESSING': return 'bg-blue-500/10 text-blue-400 border-blue-500/20';
+      case 'FAILED': return 'bg-rose-500/10 text-rose-400 border-rose-500/20';
+      default: return 'bg-amber-500/10 text-amber-400 border-amber-500/20';
+    }
+  };
 
   const handleGradeSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -141,11 +164,7 @@ export const TeacherGrading: React.FC = () => {
                     {new Date(s.createdAt).toLocaleDateString()}
                   </td>
                   <td className="px-6 py-4">
-                    <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium border ${
-                      s.status === 'GRADED' 
-                      ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20' 
-                      : 'bg-amber-500/10 text-amber-400 border-amber-500/20'
-                    }`}>
+                    <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium border ${getStatusColor(s.status)}`}>
                       {s.status === 'GRADED' ? <CheckCircle size={12} /> : <Clock size={12} />}
                       {s.status}
                     </span>
@@ -224,7 +243,12 @@ export const TeacherGrading: React.FC = () => {
                         placeholder="100"
                         className="w-full bg-white/5 border border-white/10 rounded-xl py-3 pl-12 pr-4 text-white outline-none focus:border-indigo-500 transition-all font-bold text-lg"
                         value={grade}
-                        onChange={(e) => setGrade(e.target.value === '' ? '' : Number(e.target.value))}
+                        onChange={(e) => {
+                          const val = e.target.value === '' ? '' : Number(e.target.value);
+                          if (val === '' || (val >= 0 && val <= 100)) {
+                            setGrade(val);
+                          }
+                        }}
                         required
                       />
                     </div>
@@ -269,6 +293,4 @@ export const TeacherGrading: React.FC = () => {
   );
 };
 
-// Placeholder for missing icon in previous write
-const FileText = ({ size }: { size: number }) => <FileBox size={size} />;
-import { FileBox } from 'lucide-react';
+

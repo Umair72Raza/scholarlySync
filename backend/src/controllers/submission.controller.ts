@@ -1,5 +1,11 @@
 import { Response } from 'express';
+import { SubmissionStatus } from '@prisma/client';
 import prisma from '../config/prisma';
+import { SubmissionModel } from '../models/submission.model';
+import { submissionQueue } from '../queues/submission.queue';
+import { notificationQueue } from '../queues/notification.queue';
+import { broadcast } from '../websocket/wsServer';
+import { WS_EVENTS } from '../websocket/wsEvents';
 import { AppError, catchAsync } from '../middlewares/errorHandler';
 
 export class SubmissionController {
@@ -55,6 +61,29 @@ export class SubmissionController {
       message: existing ? 'Assignment resubmitted successfully' : 'Assignment submitted successfully',
       data: submission
     });
+
+    // 4. Push to background queue for verification & AI tasks
+    await submissionQueue.add(`submit-${submission.id}`, {
+      submissionId: submission.id,
+      userId,
+      assignmentId,
+      fileUrl: submission.fileUrl,
+      fileName: submission.fileName,
+      fileSize: submission.fileSize
+    });
+
+    // 5. Notify teacher in real-time via WebSocket
+    const teacherId = assignment?.course.teacherId;
+    if (teacherId) {
+      broadcast(teacherId, {
+        event: WS_EVENTS.NEW_SUBMISSION || 'NEW_SUBMISSION',
+        payload: {
+          submissionId: submission.id,
+          assignmentTitle: assignment?.title,
+          studentName: req.user?.name || 'A student'
+        }
+      });
+    }
   });
 
   static grade = catchAsync(async (req: any, res: Response) => {
@@ -72,13 +101,33 @@ export class SubmissionController {
       throw new AppError('Only the course instructor can grade this submission', 403);
     }
 
-    const updated = await prisma.submission.update({
-      where: { id },
-      data: {
-        grade: Number(grade),
-        feedback,
-        status: 'GRADED'
+    const numericGrade = Math.round(Number(grade));
+    if (isNaN(numericGrade) || numericGrade < 0 || numericGrade > 100) {
+      throw new AppError('Grade must be a number between 0 and 100', 400);
+    }
+
+    const updated = await SubmissionModel.grade(id, numericGrade, feedback);
+
+    // ─── Post-grading: Notifications ──────────────────────────
+    const studentId = submission.userId;
+    const assignmentTitle = submission.assignment.title;
+
+    // 1. Notify via WebSocket (Real-time)
+    broadcast(studentId, {
+      event: WS_EVENTS.SUBMISSION_GRADED || 'SUBMISSION_GRADED',
+      payload: { 
+        submissionId: id,
+        grade: numericGrade,
+        assignmentTitle
       }
+    });
+
+    // 2. Queue persistent notification
+    await notificationQueue.add(`grade-${id}`, {
+      userId: studentId,
+      message: `Your submission for "${assignmentTitle}" has been graded: ${numericGrade}%`,
+      type: 'SUBMISSION_GRADED',
+      assignmentId: submission.assignmentId
     });
 
     res.json({
@@ -174,6 +223,6 @@ export class SubmissionController {
       orderBy: { createdAt: 'desc' }
     });
 
-    res.json({ success: true, data: submissions });
+    res.json({ success: true, data: { submissions } });
   });
 }

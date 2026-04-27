@@ -3,6 +3,9 @@ import { Outlet } from 'react-router-dom';
 import { Sidebar } from '../components/layout/Sidebar';
 import { Bell, Search, GraduationCap } from 'lucide-react';
 
+import { useSocketEvent } from '../context/SocketContext';
+import { toast } from 'react-hot-toast';
+
 const BaseLayout: React.FC<{ children?: React.ReactNode; roleColor: string }> = ({ children, roleColor }) => {
   return (
     <div className="min-h-screen bg-slate-950 flex">
@@ -39,6 +42,26 @@ const BaseLayout: React.FC<{ children?: React.ReactNode; roleColor: string }> = 
   );
 };
 
-export const StudentLayout: React.FC = () => <BaseLayout roleColor="bg-indigo-500" />;
-export const TeacherLayout: React.FC = () => <BaseLayout roleColor="bg-emerald-500" />;
-export const AdminLayout: React.FC   = () => <BaseLayout roleColor="bg-rose-500" />;
+export const StudentLayout: React.FC = () => {
+  useSocketEvent('SUBMISSION_GRADED', (payload) => {
+    toast.success(`Assignment "${payload.assignmentTitle}" graded: ${payload.grade}%!`, {
+      icon: '🎓',
+      style: { background: '#1e293b', color: '#fff', borderRadius: '12px', border: '1px solid rgba(255,255,255,0.1)' }
+    });
+  });
+
+  return <BaseLayout roleColor="bg-indigo-500" />;
+};
+
+export const TeacherLayout: React.FC = () => {
+  useSocketEvent('NEW_SUBMISSION', (payload) => {
+    toast.success(`New submission from ${payload.studentName}!`, {
+      icon: '📥',
+      style: { background: '#1e293b', color: '#fff', borderRadius: '12px', border: '1px solid rgba(255,255,255,0.1)' }
+    });
+  });
+
+  return <BaseLayout roleColor="bg-emerald-500" />;
+};
+
+export const AdminLayout: React.FC = () => <BaseLayout roleColor="bg-rose-500" />;

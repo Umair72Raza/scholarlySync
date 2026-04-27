@@ -12,6 +12,8 @@ import 'react-pdf/dist/Page/AnnotationLayer.css';
 import 'react-pdf/dist/Page/TextLayer.css';
 import api from '../../services/api';
 import { useAuthStore } from '../../store/authStore';
+import { useSocketEvent } from '../../context/SocketContext';
+import { toast } from 'react-hot-toast';
 
 // Set up PDF.js worker using the modern .mjs format required by v4+
 pdfjs.GlobalWorkerOptions.workerSrc = `https://unpkg.com/pdfjs-dist@${pdfjs.version}/build/pdf.worker.min.mjs`;
@@ -60,6 +62,15 @@ export const StudentCourseDetail: React.FC = () => {
     }
   });
 
+  // 📡 Real-time updates via custom hook
+  const handleUpdate = () => {
+    queryClient.invalidateQueries({ queryKey: ['student-course-detail', id] });
+  };
+
+  useSocketEvent('SUBMISSION_VERIFIED', handleUpdate);
+  useSocketEvent('SUBMISSION_GRADED', handleUpdate);
+  useSocketEvent('SUBMISSION_PROCESSING', handleUpdate);
+
   const submitMutation = useMutation({
     mutationFn: (formData: FormData) => api.post('/submissions', formData, {
       headers: { 'Content-Type': 'multipart/form-data' }
@@ -75,8 +86,9 @@ export const StudentCourseDetail: React.FC = () => {
     e.preventDefault();
     if (!uploadFile || !selectedAssignment) return;
     const formData = new FormData();
-    formData.append('file', uploadFile);
+    // Append text fields BEFORE files to ensure req.body is populated early by Multer
     formData.append('assignmentId', selectedAssignment.id);
+    formData.append('file', uploadFile);
     submitMutation.mutate(formData);
   };
 

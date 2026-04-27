@@ -24,6 +24,7 @@ enum Role {
 enum SubmissionStatus {
   QUEUED
   PROCESSING
+  VERIFIED
   GRADED
   FAILED
 }

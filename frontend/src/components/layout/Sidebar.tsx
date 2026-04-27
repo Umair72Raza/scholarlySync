@@ -34,15 +34,12 @@ export const Sidebar: React.FC = () => {
         { label: 'Dashboard', icon: LayoutDashboard, path: '/teacher' },
         { label: 'My Courses', icon: BookOpen, path: '/teacher/courses' },
         { label: 'Grading', icon: FileText, path: '/teacher/grading' },
-        { label: 'Analytics', icon: Star, path: '/teacher/analytics' },
       ];
     }
     // Student
     return [
       { label: 'Dashboard', icon: LayoutDashboard, path: '/student' },
-      { label: 'Courses', icon: BookOpen, path: '/student/courses' },
-      { label: 'Assignments', icon: Calendar, path: '/student/assignments' },
-      { label: 'AI Study Room', icon: Zap, path: '/student/ai-room' },
+      { label: 'My Courses', icon: BookOpen, path: '/student/courses' },
     ];
   };
 
@@ -83,6 +80,7 @@ export const Sidebar: React.FC = () => {
           <NavLink
             key={item.path}
             to={item.path}
+            end={item.path === '/student' || item.path === '/teacher' || item.path === '/admin'}
             className={({ isActive }) => `
               flex items-center gap-3 px-3 py-2.5 rounded-xl transition-all group
               ${isActive 
